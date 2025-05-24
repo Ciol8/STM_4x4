@@ -21,19 +21,27 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "stdio.h"
+#include "string.h"
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+#define TRIG_PIN GPIO_PIN_10
+#define TRIG_PORT GPIOB
+#define ECHO_PIN GPIO_PIN_11
+#define ECHO_PORT GPIOB
 
+#define BUZZER_PIN GPIO_PIN_8
+#define BUZZER_PORT GPIOA
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 int fadeUp = 0;
 int i = 0;
-int mode =0;
+int mode =6;
 int buttonLast = 1;
 
 
@@ -51,29 +59,72 @@ int buttonLast = 1;
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim2;
 
+UART_HandleTypeDef huart2;
+
 /* USER CODE BEGIN PV */
 
-void Set_Motor(uint8_t motor, uint8_t direction, uint16_t speed) {
-    if(motor == 1) { // Silnik 1 -> IN1 + IN2, PWM on TIM2_CH1
-        if(direction == 1) { // Forward
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);   // IN1
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET); // IN2
-        } else { // Backward
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET); // IN1
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);   // IN2
-        }
-        __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, speed);
-    } else if(motor == 2) { // Silnik 2 -> IN3 + IN4, PWM on TIM2_CH2
-        if(direction == 1) { // Forward
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);   // IN3
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // IN4
-        } else { // Backward
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET); // IN3
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);   // IN4
-        }
-        __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, speed);
-    }
+void delay_us(uint16_t us) {
+    __HAL_TIM_SET_COUNTER(&htim2, 0);
+    while (__HAL_TIM_GET_COUNTER(&htim2) < us);
 }
+
+float HCSR04_Read(void) {
+    uint32_t start_time = 0;
+    uint32_t end_time = 0;
+    uint32_t duration;
+    float distance;
+
+    // Wysyłanie impulsu
+    HAL_GPIO_WritePin(TRIG_PORT, TRIG_PIN, GPIO_PIN_RESET);
+    delay_us(2);
+    HAL_GPIO_WritePin(TRIG_PORT, TRIG_PIN, GPIO_PIN_SET);
+    delay_us(10);
+    HAL_GPIO_WritePin(TRIG_PORT, TRIG_PIN, GPIO_PIN_RESET);
+
+    // Czekaj na ECHO HIGH
+    while (HAL_GPIO_ReadPin(ECHO_PORT, ECHO_PIN) == GPIO_PIN_RESET);
+    start_time = __HAL_TIM_GET_COUNTER(&htim2);
+
+    // Czekaj na ECHO LOW
+    while (HAL_GPIO_ReadPin(ECHO_PORT, ECHO_PIN) == GPIO_PIN_SET);
+    end_time = __HAL_TIM_GET_COUNTER(&htim2);
+
+    // Oblicz czas trwania impulsu
+    if (end_time >= start_time)
+        duration = end_time - start_time;
+    else
+        duration = (999 - start_time + end_time + 1);  // przepełnienie
+
+    // Przelicz na µs, potem cm
+    distance = (duration * 10.0f) / 58.0f;
+
+    return distance;
+}
+
+
+
+void Set_Motors(uint8_t dir1, uint16_t speed1, uint8_t dir2, uint16_t speed2) {
+    // Silnik 1 - GPIOA PIN0 i PIN6, PWM TIM2_CH1
+    if(dir1 == 1) { // Forward
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);   // IN1
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET); // IN2
+    } else { // Backward
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET); // IN1
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);   // IN2
+    }
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, speed1);
+
+    // Silnik 2 - GPIOA PIN7 i PIN4, PWM TIM2_CH2
+    if(dir2 == 1) {
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET);   // IN3
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // IN4
+    } else {
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET); // IN3
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);   // IN4
+    }
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, speed2);
+}
+
 
 void Robot_Mode_Handler() {
 
@@ -82,40 +133,91 @@ void Robot_Mode_Handler() {
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET); // IN3 (Silnik 2)
 	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // IN4 (Silnik 2)
     switch (mode) {
-        case 0: // Silnik 1 do przodu
-        	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 1000);
-        	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 0);
-        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET); // IN1
-        	    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
-
-        	    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+        case 0: // Silniki do przodu
+			/*__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 800);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET); // IN1
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
+			__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 800);
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET); // IN1
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);*/
+        	Set_Motors(1,800,1,800);
             break;
 
-        case 1: // Silnik 1 do tyłu
-        	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 1000);
-
+        case 1: // Silniki do tyłu
+        	/*__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 800);
         	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET); // IN1
         	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);
-            break;
-
-        case 2: // Silnik 2 do przodu
-        	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
-        	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 1000);
-        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET); // IN1
-        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
-
-        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
-            break;
-
-        case 3: // Silnik 2 do tyłu
-        	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
-        	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 700);
+        	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 800);
         	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET); // IN1
-        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);*/
+        	Set_Motors(0,800,0,800);
             break;
 
-        case 4: // Stop
-            // already stopped above
+        case 2: // Silnik 1 PRZOD s2 lekko przod
+        	Set_Motors(1,800,1,300);
+            break;
+
+
+        case 3: // Silnik 2 PRZOD s1 lekko przod
+        	Set_Motors(1,300,1,800);
+			break;
+        case 4: // OBROT W PRAWO
+        	Set_Motors(1,800,0,800);
+			break;
+        case 5: // OBROT W LEWO
+        	Set_Motors(0,800,1,800);
+			break;
+        case 6: // Sekwencja 10 ruchów
+        	HAL_Delay(3000);
+            // 1. Jedź do przodu
+            Set_Motors(1, 800, 1, 800);
+            HAL_Delay(1000);
+
+            // 2. Jedź do tyłu
+            Set_Motors(0, 800, 0, 800);
+            HAL_Delay(1000);
+
+            // 3. Lekko w prawo do przodu
+            Set_Motors(1, 800, 1, 300);
+            HAL_Delay(1000);
+
+            // 4. Lekko w lewo do przodu
+            Set_Motors(1, 300, 1, 800);
+            HAL_Delay(1000);
+
+            // 5. Obrót w prawo (w miejscu)
+            Set_Motors(1, 800, 0, 800);
+            HAL_Delay(1000);
+
+            // 6. Obrót w lewo (w miejscu)
+            Set_Motors(0, 800, 1, 800);
+            HAL_Delay(1000);
+
+            // 7. Do przodu z pełną prędkością
+            Set_Motors(1, 1000, 1, 1000);
+            HAL_Delay(1000);
+
+            // 8. Zatrzymanie na chwilę
+            Set_Motors(0, 0, 0, 0);
+            HAL_Delay(1000);
+
+            // 9. Do tyłu z różnicą mocy (skręt w tył)
+            Set_Motors(0, 800, 0, 300);
+            HAL_Delay(1000);
+
+            // 10. Delikatny obrót w prawo (tył + przód)
+            Set_Motors(0, 400, 1, 400);
+            HAL_Delay(1000);
+
+            // Zatrzymanie po sekwencji
+            Set_Motors(0, 0, 0, 0);
+            break;
+
+
+
+        case 7: // Stop
+        	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 0);
+        	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
             break;
     }
 }
@@ -126,6 +228,7 @@ void Robot_Mode_Handler() {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -165,9 +268,11 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_TIM2_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+  HAL_TIM_Base_Start(&htim2);
 
   /* USER CODE END 2 */
 
@@ -182,11 +287,28 @@ int main(void)
 	  {
 	      mode++;
 	      HAL_Delay(50);
-	      if (mode == 5)
+	      if (mode == 8)
 	          mode = 0;
 	  }
 	  HAL_Delay(100);
 	  buttonLast = buttonNow;
+
+	  uint32_t distance = HCSR04_Read();
+
+	  char msg[32];
+	  sprintf(msg, "Distance: %lu cm\r\n", distance);
+	  HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+
+
+	      if (distance < 5 && mode == 7  ) {
+	          HAL_GPIO_WritePin(BUZZER_PORT, BUZZER_PIN, GPIO_PIN_SET);
+	         //mode = 4;
+	      } else {
+	          HAL_GPIO_WritePin(BUZZER_PORT, BUZZER_PIN, GPIO_PIN_RESET);
+	      }
+
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -229,7 +351,8 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_TIM2;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_TIM2;
+  PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
   PeriphClkInit.Tim2ClockSelection = RCC_TIM2CLK_HCLK;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
@@ -291,6 +414,41 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 9600;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -305,9 +463,14 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, IN1_Pin|IN4_Pin|IN2_Pin|IN3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, IN1_Pin|IN4_Pin|IN2_Pin|IN3_Pin
+                          |GPIO_PIN_8, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -315,12 +478,27 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : IN1_Pin IN4_Pin IN2_Pin IN3_Pin */
-  GPIO_InitStruct.Pin = IN1_Pin|IN4_Pin|IN2_Pin|IN3_Pin;
+  /*Configure GPIO pins : IN1_Pin IN4_Pin IN2_Pin IN3_Pin
+                           PA8 */
+  GPIO_InitStruct.Pin = IN1_Pin|IN4_Pin|IN2_Pin|IN3_Pin
+                          |GPIO_PIN_8;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB10 */
+  GPIO_InitStruct.Pin = GPIO_PIN_10;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB11 */
+  GPIO_InitStruct.Pin = GPIO_PIN_11;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
