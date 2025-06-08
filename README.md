@@ -1,112 +1,123 @@
-# STM_4x4
+STM_4x4
+🚗 Autonomiczny Pojazd z STM32
+Projekt semestralny z przedmiotu Systemy Wbudowane i Mikrokontrolery
 
-# 🚗 Autonomiczny Pojazd z STM32
+Autor: [Twoje imię i nazwisko]
+Numer indeksu: [Twój numer]
+Data rozpoczęcia: [Data]
 
-Projekt semestralny z przedmiotu **Systemy Wbudowane i Mikrokontrolery**  
-Autor: _[Twoje imię i nazwisko]_  
-Numer indeksu: _[Twój numer]_  
-Data rozpoczęcia: _[Data]_  
 Repozytorium zawiera kod, dokumentację oraz materiały projektowe.
 
----
+📌 Opis projektu
+Celem projektu jest opracowanie modelu autonomicznego pojazdu sterowanego za pomocą mikrokontrolera STM32 Nucleo-F303RE.
 
-## 📌 Opis projektu
+Pojazd realizuje tryby pracy:
 
-Celem projektu jest opracowanie modelu autonomicznego pojazdu sterowanego za pomocą mikrokontrolera STM32. Pojazd porusza się w trybie półautomatycznym lub automatycznym, omija przeszkody i/lub śledzi linię. Komunikacja z użytkownikiem odbywa się przez UART (Bluetooth lub przewodowo).
+automatyczny — jazda po linii + unikanie przeszkód,
 
----
+półautomatyczny — zdalne sterowanie z aplikacji przez Bluetooth.
 
-## 🛠️ Zastosowane technologie i narzędzia
+Komunikacja z użytkownikiem odbywa się przez UART (Bluetooth HC-05).
+Dodatkowo pojazd posiada funkcję sygnalizacji świetlnej i dźwiękowej oraz jest wyposażony w obudowę z blachy aluminiowej dla ochrony i estetyki.
 
-- **Mikrokontroler:** STM32 (model np. STM32F103C8T6)
-- **IDE:** STM32CubeIDE
-- **Programowanie:** C (HAL / LL)
-- **Sensory:**
-  - HC-SR04 (ultradźwiękowy)
-  - Sensory optyczne (IR)
-- **Zasilanie:** Akumulator Li-Ion / Powerbank
-- **Sterownik silników:** np. L298N
-- **Komunikacja:** UART (Bluetooth HC-05 / USB)
+🛠️ Zastosowane technologie i narzędzia
+Mikrokontroler: STM32 Nucleo-F303RE
 
----
+IDE: STM32CubeIDE
 
-## ⚙️ Funkcjonalności
+Programowanie: C (HAL)
 
-- ✅ Napęd sterowany przez PWM z użyciem Timerów
-- ✅ Obsługa sensorów ultradźwiękowych (pomiar odległości)
-- ✅ Odczyt wartości z sensorów IR (linia / przeszkody) przy użyciu ADC
-- ✅ Detekcja kolizji i unikanie przeszkód
-- ✅ Sterowanie ruchem przez UART (komendy tekstowe)
-- ✅ Zasilanie bateryjne – pełna autonomia
-- ✅ Regularne wersjonowanie kodu (min. 1 commit/tydzień)
+Sensory:
 
----
+HC-SR04 (czujnik ultradźwiękowy)
 
-## 📁 Struktura repozytorium
+3 x cyfrowe sensory optyczne IR (linia)
 
+Zasilanie: Akumulator Li-Ion (pakiet 2S 7.4V)
 
----
+Sterownik silników: L298N (mostek H)
 
-## 🔌 Komendy UART
+Komunikacja: UART (Bluetooth HC-05)
 
-| Komenda | Opis                    |
-|--------:|-------------------------|
-| `START` | Uruchamia pojazd       |
-| `STOP`  | Zatrzymuje pojazd      |
-| `LEFT`  | Skręt w lewo           |
-| `RIGHT` | Skręt w prawo          |
-| `DIST?` | Zwraca odczyt z HC-SR04 |
+⚙️ Funkcjonalności
+✅ Napęd sterowany przez PWM (4 silniki DC)
+✅ Obsługa czujnika ultradźwiękowego (pomiar odległości)
+✅ Odczyt stanu sensorów IR (jazda po linii)
+✅ Detekcja przeszkody i automatyczne zatrzymanie
+✅ Sterowanie ruchem przez Bluetooth (komendy tekstowe i przyciski w aplikacji mobilnej)
+✅ Sygnalizacja świetlna (LED) oraz dźwiękowa (buzzer)
+✅ Zasilanie bateryjne – pełna autonomia
+✅ Regularne wersjonowanie kodu
 
----
+📁 Struktura repozytorium
+bash
+Kopiuj
+Edytuj
+STM_4x4/
+├── Docs/                   # Dokumentacja (raport PDF, schematy)
+├── Media/photos/           # Zdjęcia pojazdu
+├── Media/video/            # Nagranie testów (mp4)
+├── Src/                    # Źródła oprogramowania (STM32CubeIDE)
+├── Inc/                    # Pliki nagłówkowe
+└── README.md               # Niniejszy plik
+🔌 Komendy UART
+Komenda	Opis
+START	Uruchamia tryb jazdy
+STOP	Zatrzymuje pojazd
+LEFT	Skręt w lewo
+RIGHT	Skręt w prawo
+DIST?	Zwraca odczyt z HC-SR04
+MODE	Zmiana trybu (auto/manual)
 
-## 🧪 Scenariusze testowe
+🧪 Scenariusze testowe
+Detekcja przeszkody z przodu (czujnik HC-SR04)
 
-- [x] Detekcja przeszkody z przodu (sensor HC-SR04)
-- [x] Reakcja na białą/czarną linię (IR)
-- [x] Komunikacja przez Bluetooth
-- [x] Test zasilania bateryjnego
-- [x] Sterowanie ruchem w czasie rzeczywistym
+Jazda po czarnej linii na białym tle (IR)
 
----
+Komunikacja Bluetooth (manualne sterowanie + zmiana trybu)
 
-## 📸 Demo i zdjęcia
+Test zasilania bateryjnego (autonomia)
 
-- Zdjęcia pojazdu: [`/Media/photos/`](./Media/photos/)
-- Nagranie testów: [Demo Video](#) *(link do YouTube lub Dysku Google)*
+Sygnalizacja świetlna i dźwiękowa
 
----
+Test sterowania 4 silnikami (PWM + kierunek)
 
-## 📄 Dokumentacja
+📸 Demo i zdjęcia
+Zdjęcia pojazdu: /Media/photos/
 
-Pełna dokumentacja projektu znajduje się w folderze [`Docs/`](./Docs/), w tym:
-- Raport końcowy (PDF)
-- Schematy układów
-- Lista komponentów
+Nagranie testów: /Media/video/demo.mp4 (lub link do YouTube / Dysk Google)
 
----
+📄 Dokumentacja
+Pełna dokumentacja projektu znajduje się w folderze Docs/, w tym:
 
-## 📅 Harmonogram pracy
+Raport końcowy (PDF)
 
-- Tydzień 1–2: Koncepcja i lista komponentów  
-- Tydzień 3–5: Budowa pojazdu i montaż elektroniki  
-- Tydzień 6–9: Programowanie sensorów i napędu  
-- Tydzień 10–12: Komunikacja UART + testy  
-- Tydzień 13–14: Finalizacja, dokumentacja, raport  
+Schematy układów
 
----
+Lista komponentów
 
-## 🧠 Wnioski
+📅 Harmonogram pracy
+Tydzień 1–2: Koncepcja i wybór komponentów
 
-_(Tutaj uzupełnij po zakończeniu projektu)_
+Tydzień 3–5: Budowa pojazdu (sklejka + montaż elektroniki)
 
----
+Tydzień 6–9: Programowanie sensorów, jazdy po linii, unikanie przeszkód
 
-## 📬 Kontakt
+Tydzień 10–12: Bluetooth + manualne sterowanie
 
-W razie pytań:
-- Email: _twoj.email@uczelnia.edu.pl_
-- GitHub: [Twoja nazwa użytkownika](https://github.com/TwójProfil)
+Tydzień 13–14: Finalizacja (obudowa z blachy, testy, dokumentacja)
 
----
+🧠 Wnioski
+Projekt zakończony sukcesem:
 
-**Licencja:** MIT  
+Pojazd działa zgodnie z założeniami — jazda po linii, unikanie przeszkód, sterowanie przez Bluetooth, sygnalizacja.
+
+Obudowa z blachy poprawia wygląd i chroni elektronikę.
+
+Całość funkcjonalności jest ukończona — planowane są jedynie ewentualne zmiany wizualne.
+
+📬 Kontakt
+Email: twoj.email@uczelnia.edu.pl
+GitHub: Twoja nazwa użytkownika
+
+Licencja: MIT
